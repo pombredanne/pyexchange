@@ -61,7 +61,7 @@ class ExchangeServiceSOAP(object):
 
     def _send_soap_request(self, xml, headers=None, retries=2, timeout=30, encoding="utf-8"):
         body = etree.tostring(xml, encoding=encoding)
-
+        
         response = self.connection.send(body, headers, retries, timeout)
         return response
 

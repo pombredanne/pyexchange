@@ -931,9 +931,8 @@ class Exchange2010FolderList(object):
         self.folder_ids = list()
 
         # This request uses a Calendar-specific query between two dates.
-        import ipdb
-        ipdb.set_trace()
         body = soap_request.get_folder_items(format=u'AllProperties')
+        # body = soap_request.get_folder_items(format=u'Default')
         response_xml = self.service.send(body)
         self._parse_response_for_all_events(response_xml)
 

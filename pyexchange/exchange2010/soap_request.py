@@ -157,7 +157,7 @@ def get_folder_items(format=u"Default"):
         ),
         M.ParentFolderIds(
             T.DistinguishedFolderId({
-                u'id': u'inbox',
+                u'Id': u'inbox',
             })
         )
     )
