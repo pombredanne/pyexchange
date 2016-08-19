@@ -148,8 +148,9 @@ def get_calendar_items(format=u"Default", calendar_id=u'calendar', start=None, e
 
     return root
 
-
-def get_folder_items(format=u"Default"):
+# Id can be
+ # (u'contacts', 'calendar', 'tasks')
+def get_folder_items(folder_type, format=u"Default"):
     root = M.FindFolder(
         {u'Traversal': u'Shallow'},
         M.FolderShape(
@@ -157,7 +158,7 @@ def get_folder_items(format=u"Default"):
         ),
         M.ParentFolderIds(
             T.DistinguishedFolderId({
-                u'Id': u'inbox',
+                u'Id': folder_type,
             })
         )
     )

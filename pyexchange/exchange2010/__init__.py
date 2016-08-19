@@ -774,8 +774,8 @@ class Exchange2010FolderService(BaseExchangeFolderService):
         response_xml = self.service.send(body)
         return self._parse_response_for_find_folder(response_xml)
 
-    def list_folders(self):
-        return Exchange2010FolderList(service=self.service)
+    def list_folders(self, folder_type=u'all'):
+        return Exchange2010FolderList(service=self.service, folder_type=folder_type)
 
     def _parse_response_for_find_folder(self, response):
 
@@ -924,72 +924,90 @@ class Exchange2010FolderList(object):
     Creates & Stores a list of Exchange2010CalendarEvent items in the "self.events" variable.
     """
 
-    def __init__(self, service=None):
+    def __init__(self, service=None, folder_type=u'all'):
+        """
+        @param folder_type: the type of folders to load. allowed_folder_types: (u'contacts', u'calendar', u'tasks')
+        """
+        allowed_folder_types = (u'contacts', u'calendar', u'tasks', u'all')
+        if folder_type not in allowed_folder_types:
+            raise FailedExchangeException
+
         self.service = service
         self.count = 0
         self.folders = list()
         self.folder_ids = list()
 
-        # This request uses a Calendar-specific query between two dates.
-        body = soap_request.get_folder_items(format=u'AllProperties')
-        # body = soap_request.get_folder_items(format=u'Default')
-        response_xml = self.service.send(body)
-        self._parse_response_for_all_events(response_xml)
+        # self.calendar_folders = list()
+        # self.contact_folders = list()
+        # self.task_folders = list()
+        #
+        # self.calendar_folder_ids = list()
+        # self.contact_folder_ids = list()
+        # self.task_folder_ids = list()
+
+        if folder_type != u'all':
+            # This request uses a Calendar-specific query between two dates.
+            body = soap_request.get_folder_items(folder_type, format=u'AllProperties')
+            response_xml = self.service.send(body)
+            self._parse_response_for_all_folders(response_xml, folder_type)
+        else:
+            # import all folders except the 'all' type
+            for ft in allowed_folder_types[:-1]:
+                body = soap_request.get_folder_items(ft, format=u'AllProperties')
+                response_xml = self.service.send(body)
+                self._parse_response_for_all_folders(response_xml, ft)
 
         # Populate the event ID list, for convenience reasons.
-        for event in self.events:
-            self.event_ids.append(event._id)
+        for folder in self.folders:
+            self.folder_ids.append(folder._id)
 
-        # If we have requested all the details, basically repeat the previous 3 steps,
-        # but instead of start/stop, we have a list of ID fields.
-        if self.details:
-            log.debug(u'Received request for all details, retrieving now!')
-            self.load_all_details()
-        return
-
-    def _parse_response_for_all_events(self, response):
+    def _parse_response_for_all_folders(self, response, folder_type):
         """
         This function will retrieve *most* of the event data, excluding Organizer & Attendee details
         """
-        items = response.xpath(u'//m:FindItemResponseMessage/m:RootFolder/t:Items/t:CalendarItem', namespaces=soap_request.NAMESPACES)
-        if not items:
-            items = response.xpath(u'//m:GetItemResponseMessage/m:Items/t:CalendarItem', namespaces=soap_request.NAMESPACES)
-        if items:
-            self.count = len(items)
-            log.debug(u'Found %s items' % self.count)
+        folder_xml_name = u'Folder'
+        if folder_type == u'calendar':
+            folder_xml_name = u'CalendarFolder'
 
-            for item in items:
-                self._add_event(xml=soap_request.M.Items(deepcopy(item)))
+        if folder_type == u'tasks':
+            folder_xml_name = u'TasksFolder'
+
+        if folder_type == u'contacts':
+            folder_xml_name = u'ContactsFolder'
+
+        folders = response.xpath(u'//m:FindFolderResponse/m:ResponseMessages/m:FindFolderResponseMessage/m:RootFolder/t:Folders/t:%s' % folder_xml_name, namespaces=soap_request.NAMESPACES)
+        if folders:
+            self.count += len(folders)
+            log.debug(u'Found %s calendar folders' % len(folders))
+            for folder in folders:
+                self._add_folder(xml=soap_request.M.Items(deepcopy(folder)))
         else:
-            log.debug(u'No calendar items found with search parameters.')
+            log.debug(u'No %s folders found with search parameters.' % folder_type)
 
-        return self
+    def _add_folder(self, xml=None):
+        log.debug(u'Adding new folder to all folder list.')
+        folder = Exchange2010Folder(service=self.service, xml=xml)
+        log.debug(u'Name of new fodler is %s' % folder._display_name)
+        self.folders.append(folder)
 
-    def _add_event(self, xml=None):
-        log.debug(u'Adding new event to all events list.')
-        event = Exchange2010CalendarEvent(service=self.service, xml=xml)
-        log.debug(u'Subject of new event is %s' % event.subject)
-        self.events.append(event)
-        return self
-
-    def load_all_details(self):
-        """
-        This function will execute all the event lookups for known events.
-
-        This is intended for use when you want to have a completely populated event entry, including
-        Organizer & Attendee details.
-        """
-        log.debug(u"Loading all details")
-        if self.count > 0:
-            # Now, empty out the events to prevent duplicates!
-            del(self.events[:])
-
-            # Send the SOAP request with the list of exchange ID values.
-            log.debug(u"Requesting all event details for events: {event_list}".format(event_list=str(self.event_ids)))
-            body = soap_request.get_item(exchange_id=self.event_ids, format=u'AllProperties')
-            response_xml = self.service.send(body)
-
-            # Re-parse the results for all the details!
-            self._parse_response_for_all_events(response_xml)
-
-        return self
+    # def load_all_details(self):
+    #     """
+    #     This function will execute all the event lookups for known events.
+    #
+    #     This is intended for use when you want to have a completely populated event entry, including
+    #     Organizer & Attendee details.
+    #     """
+    #     log.debug(u"Loading all details")
+    #     if self.count > 0:
+    #         # Now, empty out the events to prevent duplicates!
+    #         del(self.events[:])
+    #
+    #         # Send the SOAP request with the list of exchange ID values.
+    #         log.debug(u"Requesting all event details for events: {event_list}".format(event_list=str(self.event_ids)))
+    #         body = soap_request.get_item(exchange_id=self.event_ids, format=u'AllProperties')
+    #         response_xml = self.service.send(body)
+    #
+    #         # Re-parse the results for all the details!
+    #         self._parse_response_for_all_events(response_xml)
+    #
+    #     return self
