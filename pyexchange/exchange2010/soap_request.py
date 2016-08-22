@@ -148,6 +148,38 @@ def get_calendar_items(format=u"Default", calendar_id=u'calendar', start=None, e
 
     return root
 
+
+def find_contact_items(folder_id, initial_name=None, final_name=None,
+                       max_entries=100, **kwargs):
+    root = find_items(folder_id, **kwargs)
+    criteria = {'MaxEntriesReturned': str(max_entries)}
+    if initial_name:
+        criteria['InitialName'] = initial_name
+    if final_name:
+        criteria['FinalName'] = final_name
+    root.find(
+        'm:ItemShape', namespaces=NAMESPACES,
+    ).addnext(M.ContactsView(**criteria))
+    return root
+
+
+def find_items(folder_id, query_string=None, format=u'Default'):
+    if folder_id in DISTINGUISHED_IDS:
+        parent_id = T.DistinguishedFolderId(Id=folder_id)
+    else:
+        parent_id = T.FolderId(Id=folder_id)
+
+    root = M.FindItem(
+        M.ItemShape(T.BaseShape(format)),
+        M.ParentFolderIds(parent_id),
+        Traversal=u'Shallow',
+    )
+    if query_string:
+        root.append(M.QueryString(query_string))
+
+    return root
+
+
 # Id can be
  # (u'contacts', 'calendar', 'tasks')
 def get_folder_items(folder_type, format=u"Default"):

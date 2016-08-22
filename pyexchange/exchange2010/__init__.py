@@ -7,6 +7,7 @@ Unless required by applicable law or agreed to in writing, software?distributed 
 
 import logging
 from ..base.calendar import BaseExchangeCalendarEvent, BaseExchangeCalendarService, ExchangeEventOrganizer, ExchangeEventResponse
+from ..base.contacts import BaseExchangeContactService, BaseExchangeContactItem
 from ..base.folder import BaseExchangeFolder, BaseExchangeFolderService
 from ..base.soap import ExchangeServiceSOAP
 from ..exceptions import FailedExchangeException, ExchangeStaleChangeKeyException, ExchangeItemNotFoundException, ExchangeInternalServerTransientErrorException, ExchangeIrresolvableConflictException, InvalidEventType
@@ -30,8 +31,8 @@ class Exchange2010Service(ExchangeServiceSOAP):
     def mail(self):
         raise NotImplementedError("Sorry - nothin' here. Feel like adding it? :)")
 
-    def contacts(self):
-        raise NotImplementedError("Sorry - nothin' here. Feel like adding it? :)")
+    def contacts(self, folder_id="contacts"):
+        return Exchange2010ContactService(service=self, folder_id=folder_id)
 
     def folder(self):
         return Exchange2010FolderService(service=self)
@@ -1011,3 +1012,126 @@ class Exchange2010FolderList(object):
     #         self._parse_response_for_all_events(response_xml)
     #
     #     return self
+
+
+class Exchange2010ContactService(BaseExchangeContactService):
+    def get_contact(self, id):
+        return Exchange2010ContactItem(service=self.service, id=id)
+
+    def find_contacts(self, query=None, initial_name=None, final_name=None,
+                      max_entries=100):
+        """
+        :param str query: AQS query string
+        :param str initial_name: Lower bound on contact names (lexicographically)
+        :param str final_name: Upper bound on contact names
+        :param int max_entries: Maximum number of matches
+        """
+        body = soap_request.find_contact_items(
+            self.folder_id, query_string=query, initial_name=initial_name,
+            final_name=final_name, max_entries=max_entries,
+        )
+        response_xml = self.service.send(body)
+        return Exchange2010ContactList(service=self.service,
+                                       folder_id=self.folder_id,
+                                       xml_result=response_xml)
+
+
+class Exchange2010ContactList(object):
+    """
+    Creates & Stores a list of Exchange2010ContactItem objects in the
+    "self.items" variable.
+    """
+    def __init__(self, service, folder_id=None, xml_result=None):
+        self.service = service
+        self.count = 0
+        self.items = []
+
+        if xml_result is None:
+            # Fetch all contacts for a folder.
+            body = soap_request.find_items(folder_id=folder_id,
+                                           format=u'AllProperties')
+            xml_result = self.service.send(body)
+
+        self._parse_response_for_all_contacts(xml_result)
+
+    def _parse_response_for_all_contacts(self, xml):
+        contacts = xml.xpath(u'//t:Items/t:Contact',
+                             namespaces=soap_request.NAMESPACES)
+        if not contacts:
+            log.debug(u'No contacts returned.')
+            return
+
+        self.count = len(contacts)
+        for contact_xml in contacts:
+            log.debug(u'Adding contact item to contact list...')
+            contact = Exchange2010ContactItem(service=self.service,
+                                              xml=contact_xml)
+            log.debug(u'Added contact with id %s and display name %s.',
+                      contact.id, contact.display_name)
+            self.items.append(contact)
+
+    def __repr__(self):
+        return "<Exchange2010ContactList: [{}]>".format(
+            ', '.join(repr(item) for item in self.items),
+        )
+
+
+class Exchange2010ContactItem(BaseExchangeContactItem):
+    def _init_from_service(self, id):
+        body = soap_request.get_item(exchange_id=id, format=u'AllProperties')
+        response_xml = self.service.send(body)
+
+        return self._init_from_xml(response_xml)
+
+    def _init_from_xml(self, xml):
+        properties = self._parse_contact_properties(xml)
+
+        self._id = properties.pop('id')
+        self._change_key = properties.pop('change_key')
+
+        self._update_properties(properties)
+
+        return self
+
+    def _parse_contact_properties(self, response):
+        # Use relative selectors here so that we can call this in the
+        # context of each Contact element without deepcopying.
+        property_map = {
+            u'id': {
+                u'xpath': u'descendant-or-self::t:Contact/t:ItemId/@Id',
+            },
+            u'change_key': {
+                u'xpath': u'descendant-or-self::t:Contact/t:ItemId/@ChangeKey',
+            },
+            u'first_name': {
+                u'xpath': u'descendant-or-self::t:Contact/t:CompleteName/t:FirstName',
+            },
+            u'last_name': {
+                u'xpath': u'descendant-or-self::t:Contact/t:CompleteName/t:LastName',
+            },
+            u'full_name': {
+                u'xpath': u'descendant-or-self::t:Contact/t:CompleteName/t:FullName',
+            },
+            u'display_name': {
+                u'xpath': u'descendant-or-self::t:Contact/t:DisplayName',
+            },
+            u'sort_name': {
+                u'xpath': u'descendant-or-self::t:Contact/t:FileAs',
+            },
+            u'email_address1': {
+                u'xpath': u"descendant-or-self::t:Contact/t:EmailAddresses/t:Entry[@Key='EmailAddress1']",
+            },
+            u'email_address2': {
+                u'xpath': u"descendant-or-self::t:Contact/t:EmailAddresses/t:Entry[@Key='EmailAddress2']",
+            },
+            u'email_address3': {
+                u'xpath': u"descendant-or-self::t:Contact/t:EmailAddresses/t:Entry[@Key='EmailAddress3']",
+            },
+        }
+        return self.service._xpath_to_dict(
+            element=response, property_map=property_map,
+            namespace_map=soap_request.NAMESPACES,
+        )
+
+    def __repr__(self):
+        return "<Exchange2010ContactItem: {}>".format(self.display_name.encode('utf-8'))

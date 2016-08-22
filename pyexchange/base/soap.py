@@ -108,19 +108,25 @@ class ExchangeServiceSOAP(object):
                 for node in nodes:
                     cast_as = item.get(u'cast', None)
 
+                    if hasattr(node, 'text'):
+                        text = node.text
+                    else:
+                        # Attribute nodes are returned as strings directly.
+                        text = node
+
                     if cast_as == u'datetime':
-                        result_for_node.append(self._parse_date(node.text))
+                        result_for_node.append(self._parse_date(text))
                     elif cast_as == u'date_only_naive':
-                        result_for_node.append(self._parse_date_only_naive(node.text))
+                        result_for_node.append(self._parse_date_only_naive(text))
                     elif cast_as == u'int':
-                        result_for_node.append(int(node.text))
+                        result_for_node.append(int(text))
                     elif cast_as == u'bool':
-                        if node.text.lower() == u'true':
+                        if text.lower() == u'true':
                             result_for_node.append(True)
                         else:
                             result_for_node.append(False)
                     else:
-                        result_for_node.append(node.text)
+                        result_for_node.append(text)
 
                 if not result_for_node:
                     result[key] = None
