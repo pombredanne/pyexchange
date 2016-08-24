@@ -27,6 +27,13 @@ class BaseExchangeContactItem(object):
     email_address1 = None
     email_address2 = None
     email_address3 = None
+    birthday = None
+    job_title = None
+    department = None
+    primary_phone = None
+    business_phone = None
+    home_phone = None
+    mobile_phone = None
 
     def __init__(self, service, id=None, xml=None, **kwargs):
         self.service = service

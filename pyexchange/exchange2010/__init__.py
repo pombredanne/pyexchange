@@ -1133,6 +1133,27 @@ class Exchange2010ContactItem(BaseExchangeContactItem):
             u'email_address3': {
                 u'xpath': u"descendant-or-self::t:Contact/t:EmailAddresses/t:Entry[@Key='EmailAddress3']",
             },
+            u'birthday': {
+                u'xpath': u'descendant-or-self::t:Contact/t:Birthday',
+            },
+            u'job_title': {
+                u'xpath': u'descendant-or-self::t:Contact/t:JobTitle',
+            },
+            u'department': {
+                u'xpath': u'descendant-or-self::t:Contact/t:Department',
+            },
+            u'primary_phone': {
+                u'xpath': u"descendant-or-self::t:Contact/t:PhoneNumbers/t:Entry[@Key='PrimaryPhone']",
+            },
+            u'business_phone': {
+                u'xpath': u"descendant-or-self::t:Contact/t:PhoneNumbers/t:Entry[@Key='BusinessPhone']",
+            },
+            u'home_phone': {
+                u'xpath': u"descendant-or-self::t:Contact/t:PhoneNumbers/t:Entry[@Key='HomePhone']",
+            },
+            u'mobile_phone': {
+                u'xpath': u"descendant-or-self::t:Contact/t:PhoneNumbers/t:Entry[@Key='MobilePhone']",
+            },
         }
         return self.service._xpath_to_dict(
             element=response, property_map=property_map,
