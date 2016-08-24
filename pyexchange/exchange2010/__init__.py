@@ -206,6 +206,27 @@ class Exchange2010CalendarEvent(BaseExchangeCalendarEvent):
     def as_json(self):
         raise NotImplementedError
 
+    def serialize(self):
+        return {
+            'start': self.start,
+            'end': self.end,
+            'eid': self._id,
+            'attendees': self.attendees,
+            'resources': self.resources,
+            'type': self.type,
+            'availability': self.availability,
+            'calendar_id': self.calendar_id,
+            'html_body': self.html_body,
+            'is_all_day': self.is_all_day,
+            'location': self.location,
+            'organizer': {
+                'name': self.organizer[0],
+                'email': self.organizer[1],
+                },
+            'subject': self.subject,
+            'url': 'https://rukai.ubergrape.com/owa/?ver=15.1.225.49&cver=15.1.225.42&cf=1&vC=0&forceBO=false#path=/calendar/view/Month',
+        }
+
     def validate(self):
 
         if self.recurrence is not None:
@@ -494,7 +515,6 @@ class Exchange2010CalendarEvent(BaseExchangeCalendarEvent):
             return None, None
 
     def _parse_response_for_get_event(self, response):
-
         result = self._parse_event_properties(response)
 
         organizer_properties = self._parse_event_organizer(response)
