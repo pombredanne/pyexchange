@@ -1034,6 +1034,13 @@ class Exchange2010ContactService(BaseExchangeContactService):
                                        folder_id=self.folder_id,
                                        xml_result=response_xml)
 
+    def get_all_contacts(self):
+        """
+        Return a list of all contacts in the current folder.
+        """
+        return Exchange2010ContactList(service=self.service,
+                                       folder_id=self.folder_id)
+
 
 class Exchange2010ContactList(object):
     """
