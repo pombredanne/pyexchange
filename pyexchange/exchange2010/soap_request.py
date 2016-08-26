@@ -76,6 +76,20 @@ def delete_field(field_uri):
     return root
 
 
+def convert_id(id_value, destination_format, format=u'EwsId',
+               mailbox=u'a@b.com'):
+    return M.ConvertId(
+        M.SourceIds(
+            T.AlternateId(
+                Format=format,
+                Id=id_value,
+                Mailbox=mailbox,
+            )
+        ),
+        DestinationFormat=destination_format,
+    )
+
+
 def get_item(exchange_id, format=u"Default"):
     """
       Requests a calendar item from the store.

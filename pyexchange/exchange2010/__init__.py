@@ -37,6 +37,13 @@ class Exchange2010Service(ExchangeServiceSOAP):
     def folder(self):
         return Exchange2010FolderService(service=self)
 
+    def convert_id(self, from_id, destination_format, format='EwsId',
+                   mailbox='a@b.com'):
+        body = soap_request.convert_id(from_id, destination_format,
+                                       format, mailbox)
+        response = self.send(body)
+        return response.xpath(u'//m:ConvertIdResponseMessage/m:AlternateId/@Id')
+
     def _send_soap_request(self, body, headers=None, retries=2, timeout=30, encoding="utf-8"):
         headers = {
             "Accept": "text/xml",
