@@ -15,6 +15,7 @@ class BaseExchangeContactItem(object):
     _change_key = None
 
     _service = None
+    folder_id = None
 
     _track_dirty_attributes = False
     _dirty_attributes = set()  # any attributes that have changed, and we need to update in Exchange
@@ -35,8 +36,9 @@ class BaseExchangeContactItem(object):
     home_phone = None
     mobile_phone = None
 
-    def __init__(self, service, id=None, xml=None, **kwargs):
+    def __init__(self, service, id=None, xml=None, folder_id=None, **kwargs):
         self.service = service
+        self.folder_id = folder_id
 
         if xml is not None:
             self._init_from_xml(xml)

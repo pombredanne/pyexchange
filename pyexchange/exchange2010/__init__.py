@@ -1056,6 +1056,7 @@ class Exchange2010ContactList(object):
     """
     def __init__(self, service, folder_id=None, xml_result=None):
         self.service = service
+        self.folder_id = folder_id
         self.count = 0
         self.items = []
 
@@ -1078,6 +1079,7 @@ class Exchange2010ContactList(object):
         for contact_xml in contacts:
             log.debug(u'Adding contact item to contact list...')
             contact = Exchange2010ContactItem(service=self.service,
+                                              folder_id=self.folder_id,
                                               xml=contact_xml)
             log.debug(u'Added contact with id %s and display name %s.',
                       contact.id, contact.display_name)
@@ -1115,6 +1117,9 @@ class Exchange2010ContactItem(BaseExchangeContactItem):
             },
             u'change_key': {
                 u'xpath': u'descendant-or-self::t:Contact/t:ItemId/@ChangeKey',
+            },
+            u'folder_id': {
+                u'xpath': u'descendant-or-self::t:Contact/t:ParentFolderId/@Id',
             },
             u'first_name': {
                 u'xpath': u'descendant-or-self::t:Contact/t:CompleteName/t:FirstName',
