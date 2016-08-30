@@ -9,6 +9,7 @@ import logging
 from ..base.calendar import BaseExchangeCalendarEvent, BaseExchangeCalendarService, ExchangeEventOrganizer, ExchangeEventResponse
 from ..base.contacts import BaseExchangeContactService, BaseExchangeContactItem
 from ..base.folder import BaseExchangeFolder, BaseExchangeFolderService
+from ..base.mail import BaseExchangeMailService, BaseExchangeMailItem
 from ..base.soap import ExchangeServiceSOAP
 from ..exceptions import FailedExchangeException, ExchangeStaleChangeKeyException, ExchangeItemNotFoundException, ExchangeInternalServerTransientErrorException, ExchangeIrresolvableConflictException, InvalidEventType
 from ..compat import BASESTRING_TYPES
@@ -28,14 +29,14 @@ class Exchange2010Service(ExchangeServiceSOAP):
     def calendar(self, id="calendar"):
         return Exchange2010CalendarService(service=self, calendar_id=id)
 
-    def mail(self):
-        raise NotImplementedError("Sorry - nothin' here. Feel like adding it? :)")
-
     def contacts(self, folder_id="contacts"):
         return Exchange2010ContactService(service=self, folder_id=folder_id)
 
     def folder(self):
         return Exchange2010FolderService(service=self)
+
+    def mail(self, mail_folder_id="inbox"):
+        return Exchange2010MailService(service=self, mail_folder_id=mail_folder_id)
 
     def convert_id(self, from_id, destination_format, format='EwsId',
                    mailbox='a@b.com'):
@@ -935,7 +936,7 @@ class Exchange2010FolderList(object):
         """
         @param folder_type: the type of folders to load. allowed_folder_types: (u'contacts', u'calendar', u'tasks')
         """
-        allowed_folder_types = (u'contacts', u'calendar', u'tasks', u'all')
+        allowed_folder_types = (u'contacts', u'calendar', u'tasks', u'all', u'inbox')
         if folder_type not in allowed_folder_types:
             raise FailedExchangeException
 
@@ -944,19 +945,10 @@ class Exchange2010FolderList(object):
         self.folders = list()
         self.folder_ids = list()
 
-        # self.calendar_folders = list()
-        # self.contact_folders = list()
-        # self.task_folders = list()
-        #
-        # self.calendar_folder_ids = list()
-        # self.contact_folder_ids = list()
-        # self.task_folder_ids = list()
-
         if folder_type != u'all':
-            # This request uses a Calendar-specific query between two dates.
-            body = soap_request.get_folder_items(folder_type, format=u'AllProperties')
-            response_xml = self.service.send(body)
-            self._parse_response_for_all_folders(response_xml, folder_type)
+                body = soap_request.get_folder_items(folder_type, format=u'AllProperties')
+                response_xml = self.service.send(body)
+                self._parse_response_for_all_folders(response_xml, folder_type)
         else:
             # import all folders except the 'all' type
             for ft in allowed_folder_types[:-1]:
@@ -982,6 +974,9 @@ class Exchange2010FolderList(object):
         if folder_type == u'contacts':
             folder_xml_name = u'ContactsFolder'
 
+        if folder_type == u'inbox':
+            folder_xml_name = u'Folder'
+
         folders = response.xpath(u'//m:FindFolderResponse/m:ResponseMessages/m:FindFolderResponseMessage/m:RootFolder/t:Folders/t:%s' % folder_xml_name, namespaces=soap_request.NAMESPACES)
         if folders:
             self.count += len(folders)
@@ -996,28 +991,6 @@ class Exchange2010FolderList(object):
         folder = Exchange2010Folder(service=self.service, xml=xml)
         log.debug(u'Name of new fodler is %s' % folder._display_name)
         self.folders.append(folder)
-
-    # def load_all_details(self):
-    #     """
-    #     This function will execute all the event lookups for known events.
-    #
-    #     This is intended for use when you want to have a completely populated event entry, including
-    #     Organizer & Attendee details.
-    #     """
-    #     log.debug(u"Loading all details")
-    #     if self.count > 0:
-    #         # Now, empty out the events to prevent duplicates!
-    #         del(self.events[:])
-    #
-    #         # Send the SOAP request with the list of exchange ID values.
-    #         log.debug(u"Requesting all event details for events: {event_list}".format(event_list=str(self.event_ids)))
-    #         body = soap_request.get_item(exchange_id=self.event_ids, format=u'AllProperties')
-    #         response_xml = self.service.send(body)
-    #
-    #         # Re-parse the results for all the details!
-    #         self._parse_response_for_all_events(response_xml)
-    #
-    #     return self
 
 
 class Exchange2010ContactService(BaseExchangeContactService):
@@ -1174,3 +1147,108 @@ class Exchange2010ContactItem(BaseExchangeContactItem):
 
     def __repr__(self):
         return "<Exchange2010ContactItem: {}>".format(self.display_name.encode('utf-8'))
+
+
+class Exchange2010MailService(BaseExchangeMailService):
+    def list_mails(self):
+        return Exchange2010MailList(service=self.service, mail_folder_id=self.mail_folder_id)
+
+
+class Exchange2010MailList(object):
+    def __init__(self, service=None, mail_folder_id=u'inbox', xml_result=None):
+        self.service = service
+        self.mail_folder_id = mail_folder_id
+        self.items = []
+
+        if xml_result is None:
+            # Fetch all contacts for a folder.
+            body = soap_request.find_items(folder_id=mail_folder_id,
+                                           format=u'AllProperties')
+            xml_result = self.service.send(body)
+
+        self._parse_response_for_all_contacts(xml_result)
+
+    def _parse_response_for_all_contacts(self, xml):
+        mails = xml.xpath(u'//t:Items/t:Message',
+                          namespaces=soap_request.NAMESPACES)
+        if not mails:
+            log.debug(u'No mails returned.')
+            return
+
+        self.count = len(mails)
+        for mail_xml in mails:
+            log.debug(u'Adding contact item to contact list...')
+            mail = Exchange2010MailItem(service=self.service,
+                                        folder_id=self.mail_folder_id,
+                                        xml=mail_xml)
+            log.debug(u'Added mail with id %s and subject %s.',
+                      mail.id, mail.subject)
+            self.items.append(mail)
+
+
+class Exchange2010MailItem(BaseExchangeMailItem):
+    def _init_from_service(self, id):
+        body = soap_request.get_item(exchange_id=id, format=u'AllProperties')
+        response_xml = self.service.send(body)
+
+        return self._init_from_xml(response_xml)
+
+    def _init_from_xml(self, xml):
+        properties = self._parse_contact_properties(xml)
+
+        self._id = properties.pop('id')
+        self._change_key = properties.pop('change_key')
+
+        self._update_properties(properties)
+
+        return self
+
+    def _parse_contact_properties(self, response):
+        # Use relative selectors here so that we can call this in the
+        # context of each Contact element without deepcopying.
+
+        property_map = {
+            u'id': {
+                u'xpath': u'descendant-or-self::t:Message/t:ItemId/@Id',
+            },
+            u'change_key': {
+                u'xpath': u'descendant-or-self::t:Message/t:ItemId/@ChangeKey',
+            },
+            u'subject': {
+                u'xpath': u'descendant-or-self::t:Subject',
+            },
+            u'sender_mail': {
+                u'xpath': u'descendant-or-self::t:Message/t:Sender/t:Mailbox/t:EmailAddress',
+            },
+            u'sender_name': {
+                u'xpath': u'descendant-or-self::t:Message/t:Sender/t:Mailbox/t:Name',
+            },
+            u'from_mail': {
+                u'xpath': u'descendant-or-self::t:Message/t:From/t:Mailbox/t:EmailAddress',
+            },
+            u'from_name': {
+                u'xpath': u'descendant-or-self::t:Message/t:From/t:Mailbox/t:Name',
+            },
+            u'culture': {
+                u'xpath': u'descendant-or-self::t:Message/t:Culture',
+            },
+            u'has_attachments': {
+                u'xpath': u'descendant-or-self::t:Message/t:HasAttachments',
+            },
+            u'size': {
+                u'xpath': u'descendant-or-self::t:Message/t:Size',
+            },
+            u'importance': {
+                u'xpath': u'descendant-or-self::t:Message/t:Importance',
+            },
+            u'received': {
+                u'xpath': u'descendant-or-self::t:Message/t:DateTimeReceived',
+            },
+        }
+        return self.service._xpath_to_dict(
+            element=response, property_map=property_map,
+            namespace_map=soap_request.NAMESPACES,
+        )
+
+    def __repr__(self):
+        return "<Exchange2010MailItem: {}>".format(self.subject.encode('utf-8'))

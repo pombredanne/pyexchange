@@ -195,16 +195,16 @@ def find_items(folder_id, query_string=None, format=u'Default'):
 
 
 # Id can be
- # (u'contacts', 'calendar', 'tasks')
-def get_folder_items(folder_type, format=u"Default"):
+# (u'contacts', 'calendar', 'tasks')
+def get_folder_items(distinguished_folder_id, format=u"Default", traversal=u'Shallow'):
     root = M.FindFolder(
-        {u'Traversal': u'Shallow'},
+        {u'Traversal': traversal},
         M.FolderShape(
             T.BaseShape(format)
         ),
         M.ParentFolderIds(
             T.DistinguishedFolderId({
-                u'Id': folder_type,
+                u'Id': distinguished_folder_id,
             })
         )
     )
