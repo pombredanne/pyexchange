@@ -194,6 +194,22 @@ def find_items(folder_id, query_string=None, format=u'Default'):
     return root
 
 
+def get_mail_items(items, format=u'Default', include_mime_content=True):
+    incl_mime_content = "true"
+    if not include_mime_content:
+        incl_mime_content = "false"
+
+    root = M.GetItem(
+        M.ItemShape(T.BaseShape(format),
+                    T.IncludeMimeContent(incl_mime_content)),
+        M.ItemIds()
+    )
+
+    items_node = root.xpath("//m:ItemIds", namespaces=NAMESPACES)[0]
+    for i in items:
+        items_node.append(T.OccurrenceItemId(Id=i._id, ChangeKey=i._change_key))
+    return root
+
 # Id can be
 # (u'contacts', 'calendar', 'tasks')
 def get_folder_items(distinguished_folder_id, format=u"Default", traversal=u'Shallow'):
