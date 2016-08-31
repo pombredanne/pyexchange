@@ -24,6 +24,10 @@ class BaseExchangeMailItem(object):
     size = None
     importance = None
     received = None
+    # extended properties
+    datetime_sent = None
+    datetime_created = None
+    mimecontent = None  # base64 encoded
 
     def __init__(self, service, id=None, xml=None, folder_id=None, **kwargs):
         self.service = service
@@ -67,3 +71,4 @@ class BaseExchangeMailItem(object):
 
     def _reset_dirty_attributes(self):
         self._dirty_attributes = set()
+

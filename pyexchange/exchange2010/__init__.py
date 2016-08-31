@@ -1166,9 +1166,33 @@ class Exchange2010MailList(object):
                                            format=u'AllProperties')
             xml_result = self.service.send(body)
 
-        self._parse_response_for_all_contacts(xml_result)
+        self._parse_response_for_all_mails(xml_result)
 
-    def _parse_response_for_all_contacts(self, xml):
+    def load_extended_properties(self):
+        body = soap_request.get_mail_items(self.items)
+        xml_result = self.service.send(body)
+
+        self._parse_response_for_extended_properties(xml_result)
+
+    def _parse_response_for_extended_properties(self, xml):
+        mails = xml.xpath(u'//t:Message',
+                          namespaces=soap_request.NAMESPACES)
+        mail_dict = {}
+        for m in self.items:
+            mail_dict[m._id] = m
+
+        if not mails:
+            log.debug(u'No mails extended properties returned.')
+            return
+
+        for mail_xml in mails:
+            log.debug(u'Adding contact item to contact list...')
+            id = mail_xml.xpath(u'descendant-or-self::t:Message/t:ItemId/@Id',
+                                namespaces=soap_request.NAMESPACES)
+            mail = mail_dict[id[0]]
+            mail.load_details_from_xml(mail_xml)
+
+    def _parse_response_for_all_mails(self, xml):
         mails = xml.xpath(u'//t:Items/t:Message',
                           namespaces=soap_request.NAMESPACES)
         if not mails:
@@ -1194,7 +1218,7 @@ class Exchange2010MailItem(BaseExchangeMailItem):
         return self._init_from_xml(response_xml)
 
     def _init_from_xml(self, xml):
-        properties = self._parse_contact_properties(xml)
+        properties = self._parse_mail_properties(xml)
 
         self._id = properties.pop('id')
         self._change_key = properties.pop('change_key')
@@ -1203,7 +1227,7 @@ class Exchange2010MailItem(BaseExchangeMailItem):
 
         return self
 
-    def _parse_contact_properties(self, response):
+    def _parse_mail_properties(self, xml):
         # Use relative selectors here so that we can call this in the
         # context of each Contact element without deepcopying.
 
@@ -1246,9 +1270,35 @@ class Exchange2010MailItem(BaseExchangeMailItem):
             },
         }
         return self.service._xpath_to_dict(
-            element=response, property_map=property_map,
+            element=xml, property_map=property_map,
             namespace_map=soap_request.NAMESPACES,
         )
+
+    def _parse_mail_extended_properties(self, xml):
+        # Use relative selectors here so that we can call this in the
+        # context of each Contact element without deepcopying.
+        property_map = {
+            u'datetime_sent': {
+                u'xpath': u'descendant-or-self::t:Message/t:DateTimeSent',
+            },
+            u'datetime_created': {
+                u'xpath': u'descendant-or-self::t:Message/t:DateTimeCreated',
+            },
+            u'mimecontent': {
+                u'xpath': u'descendant-or-self::t:Message/t:MimeContent',
+            },
+        }
+        return self.service._xpath_to_dict(
+            element=xml, property_map=property_map,
+            namespace_map=soap_request.NAMESPACES,
+        )
+
+    def load_details_from_xml(self, xml, load_attachments=False):
+        if load_attachments:
+            raise NotImplemented
+        properties = self._parse_mail_extended_properties(xml)
+        self._update_properties(properties)
+        return self
 
     def __repr__(self):
         return "<Exchange2010MailItem: {}>".format(self.subject.encode('utf-8'))
