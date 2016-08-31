@@ -1164,10 +1164,16 @@ class Exchange2010MailList(object):
         self._parse_response_for_all_mails(xml_result)
 
     def load_extended_properties(self):
-        body = soap_request.get_mail_items(self.items)
-        xml_result = self.service.send(body)
+        """
+        loads additional mail info via soap
+        if there are no items, nothing is done (empty items would cause soap error 500)
+        """
+        if self.items:
+            body = soap_request.get_mail_items(self.items)
+            logging.info(etree.tostring(body))
+            xml_result = self.service.send(body)
 
-        self._parse_response_for_extended_properties(xml_result)
+            self._parse_response_for_extended_properties(xml_result)
 
     def _parse_response_for_extended_properties(self, xml):
         mails = xml.xpath(u'//t:Message',
