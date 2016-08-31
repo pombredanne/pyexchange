@@ -35,8 +35,8 @@ class Exchange2010Service(ExchangeServiceSOAP):
     def folder(self):
         return Exchange2010FolderService(service=self)
 
-    def mail(self, mail_folder_id="inbox"):
-        return Exchange2010MailService(service=self, mail_folder_id=mail_folder_id)
+    def mail(self, folder_id="inbox"):
+        return Exchange2010MailService(service=self, folder_id=folder_id)
 
     def convert_id(self, from_id, destination_format, format='EwsId',
                    mailbox='a@b.com'):
@@ -801,19 +801,14 @@ class Exchange2010FolderService(BaseExchangeFolderService):
 
 
 class Exchange2010Folder(BaseExchangeFolder):
-
     def _init_from_service(self, id):
-
         body = soap_request.get_folder(folder_id=id, format=u'AllProperties')
         response_xml = self.service.send(body)
         properties = self._parse_response_for_get_folder(response_xml)
-
         self._update_properties(properties)
-
         return self
 
     def _init_from_xml(self, xml):
-
         properties = self._parse_response_for_get_folder(xml)
         self._update_properties(properties)
 
@@ -1151,18 +1146,18 @@ class Exchange2010ContactItem(BaseExchangeContactItem):
 
 class Exchange2010MailService(BaseExchangeMailService):
     def list_mails(self):
-        return Exchange2010MailList(service=self.service, mail_folder_id=self.mail_folder_id)
+        return Exchange2010MailList(service=self.service, folder_id=self.folder_id)
 
 
 class Exchange2010MailList(object):
-    def __init__(self, service=None, mail_folder_id=u'inbox', xml_result=None):
+    def __init__(self, service=None, folder_id=u'inbox', xml_result=None):
         self.service = service
-        self.mail_folder_id = mail_folder_id
+        self.mail_folder_id = folder_id
         self.items = []
 
         if xml_result is None:
             # Fetch all contacts for a folder.
-            body = soap_request.find_items(folder_id=mail_folder_id,
+            body = soap_request.find_items(folder_id=folder_id,
                                            format=u'AllProperties')
             xml_result = self.service.send(body)
 

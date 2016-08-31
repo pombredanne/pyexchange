@@ -1,7 +1,7 @@
 class BaseExchangeMailService(object):
-    def __init__(self, service, mail_folder_id):
+    def __init__(self, service, folder_id):
         self.service = service
-        self.mail_folder_id = mail_folder_id
+        self.folder_id = folder_id
 
 
 class BaseExchangeMailItem(object):
