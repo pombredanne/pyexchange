@@ -10,6 +10,7 @@ from ..base.calendar import BaseExchangeCalendarEvent, BaseExchangeCalendarServi
 from ..base.contacts import BaseExchangeContactService, BaseExchangeContactItem
 from ..base.folder import BaseExchangeFolder, BaseExchangeFolderService
 from ..base.mail import BaseExchangeMailService, BaseExchangeMailItem
+from ..base.tasks import BaseExchangeTaskService, BaseExchangeTaskItem
 from ..base.soap import ExchangeServiceSOAP
 from ..exceptions import FailedExchangeException, ExchangeStaleChangeKeyException, ExchangeItemNotFoundException, ExchangeInternalServerTransientErrorException, ExchangeIrresolvableConflictException, InvalidEventType
 from ..compat import BASESTRING_TYPES
@@ -37,6 +38,9 @@ class Exchange2010Service(ExchangeServiceSOAP):
 
     def mail(self, folder_id="inbox"):
         return Exchange2010MailService(service=self, folder_id=folder_id)
+
+    def tasks(self, folder_id="tasks"):
+        return Exchange2010TaskService(service=self, folder_id=folder_id)
 
     def convert_id(self, from_id, destination_format, format='EwsId',
                    mailbox='a@b.com'):
@@ -1364,3 +1368,151 @@ class Exchange2010MailItem(BaseExchangeMailItem):
 
     def __repr__(self):
         return "<Exchange2010MailItem: {}>".format(self.subject.encode('utf-8'))
+
+
+class Exchange2010TaskService(BaseExchangeTaskService):
+    def get_task(self, id):
+        return Exchange2010TaskItem(service=self.service, id=id)
+
+    def get_all_tasks(self):
+        """
+        Return a list of all tasks in the current folder.
+        """
+        return Exchange2010TaskList(service=self.service,
+                                    folder_id=self.folder_id)
+
+
+class Exchange2010TaskList(object):
+    """
+    Creates & Stores a list of Exchange2010ContactItem objects in the
+    "self.items" variable.
+    """
+    def __init__(self, service, folder_id=None, xml_result=None):
+        self.service = service
+        self.folder_id = folder_id
+        self.count = 0
+        self.items = []
+
+        if xml_result is None:
+            # Fetch all contacts for a folder.
+            body = soap_request.find_items(folder_id=folder_id,
+                                           format=u'AllProperties')
+            xml_result = self.service.send(body)
+
+        self._parse_response_for_all_tasks(xml_result)
+
+    def _parse_response_for_all_tasks(self, xml):
+        tasks = xml.xpath(u'//t:Items/t:Task',
+                          namespaces=soap_request.NAMESPACES)
+        if not tasks:
+            log.debug(u'No tasks returned.')
+            return
+
+        self.count = len(tasks)
+        for task_xml in tasks:
+            log.debug(u'Adding task item to task list...')
+            task = Exchange2010TaskItem(service=self.service,
+                                        folder_id=self.folder_id,
+                                        xml=task_xml)
+            log.debug(u'Added task with id %s and subject %s.',
+                      task.id, task.subject)
+            self.items.append(task)
+
+    def __repr__(self):
+        return "<Exchange2010TaskList: [{}]>".format(
+            ', '.join(repr(item) for item in self.items),
+        )
+
+
+class Exchange2010TaskItem(BaseExchangeTaskItem):
+    def _init_from_service(self, id):
+        body = soap_request.get_item(exchange_id=id, format=u'AllProperties')
+        response_xml = self.service.send(body)
+
+        return self._init_from_xml(response_xml)
+
+    def _init_from_xml(self, xml):
+        properties = self._parse_task_properties(xml)
+
+        self._id = properties.pop('id')
+        self._change_key = properties.pop('change_key')
+
+        self._update_properties(properties)
+
+        return self
+
+    def _parse_task_properties(self, response):
+        # Use relative selectors here so that we can call this in the
+        # context of each Contact element without deepcopying.
+        property_map = {
+            u'id': {
+                u'xpath': u'descendant-or-self::t:Task/t:ItemId/@Id',
+            },
+            u'change_key': {
+                u'xpath': u'descendant-or-self::t:Task/t:ItemId/@ChangeKey',
+            },
+            u'folder_id': {
+                u'xpath': u'descendant-or-self::t:Task/t:ParentFolderId/@Id',
+            },
+            u'subject': {
+                u'xpath': u'descendant-or-self::t:Task/t:Subject',
+            },
+            u'body': {
+                u'xpath': u'descendant-or-self::t:Task/t:Body[@BodyType=\'Text\']',
+            },
+            u'categories': {
+                u'xpath': u'descendant-or-self::t:Task/t:Categories/t:String',
+            },
+            u'is_draft': {
+                u'xpath': u'descendant-or-self::t:Task/t:IsDraft',
+                u'cast': u'bool',
+            },
+            u'sent_at': {
+                u'xpath': u'descendant-or-self::t:Task/t:DateTimeSent',
+                u'cast': u'datetime',
+            },
+            u'created_at': {
+                u'xpath': u'descendant-or-self::t:Task/t:DateTimeCreated',
+                u'cast': u'datetime',
+            },
+            u'due_date': {
+                u'xpath': u"descendant-or-self::t:Task/t:DueDate",
+                u'cast': u'datetime',
+            },
+            # TODO: find a way to represent recurrence
+            # https://msdn.microsoft.com/en-us/library/office/aa564273(v=exchg.150).aspx
+            #u'recurrence': {
+            #    u'xpath': u"descendant-or-self::t:Task/t:Recurrence",
+            #},
+            u'is_complete': {
+                u'xpath': u'descendant-or-self::t:Task/t:IsComplete',
+                u'cast': u'bool',
+            },
+            u'owner': {
+                u'xpath': u'descendant-or-self::t:Task/t:Owner',
+            },
+            u'start_date': {
+                u'xpath': u'descendant-or-self::t:Task/t:StartDate',
+                u'cast': u'datetime',
+            },
+            u'status': {
+                u'xpath': u"descendant-or-self::t:Task/t:Status",
+            },
+            u'status_description': {
+                u'xpath': u"descendant-or-self::t:Task/t:StatusDescription",
+            },
+            u'last_modified_by': {
+                u'xpath': u"descendant-or-self::t:Task/t:LastModifiedName",
+            },
+            u'last_modified_at': {
+                u'xpath': u"descendant-or-self::t:Task/t:LastModifiedTime",
+                u'cast': u'datetime',
+            },
+        }
+        return self.service._xpath_to_dict(
+            element=response, property_map=property_map,
+            namespace_map=soap_request.NAMESPACES,
+        )
+
+    def __repr__(self):
+        return "<Exchange2010TaskItem: {}>".format(self.subject.encode('utf-8'))
