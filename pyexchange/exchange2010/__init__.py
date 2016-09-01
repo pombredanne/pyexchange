@@ -1300,8 +1300,6 @@ class Exchange2010MailItem(BaseExchangeMailItem):
         properties = self._parse_mail_extended_properties(xml)
         self._update_properties(properties)
         """
-        import ipdb
-        ipdb.set_trace()
         attachments = xml.xpath(u'//t:FileAttachment', namespaces=soap_request.NAMESPACES)
         to_recipients = xml.xpath(u'//t:ToRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
         cc_recipients = xml.xpath(u'//t:CcRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
