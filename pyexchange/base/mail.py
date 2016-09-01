@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+import base64
+
+
 class BaseExchangeMailService(object):
     def __init__(self, service, folder_id):
         self.service = service
@@ -28,6 +32,20 @@ class BaseExchangeMailItem(object):
     datetime_sent = None
     datetime_created = None
     mimecontent = None  # base64 encoded
+    attachments = []
+    to_recipients = []
+    cc_recipients = []
+
+    @property
+    def sender(self):
+        if self.from_name is None or self.from_email is None:
+            return u'%s <%s>' % (self.sender_name, self.sender_email)
+        else:
+            return u'%s <%s>' % (self.from_name, self.from_email)
+
+    @property
+    def body(self):
+        return base64.b64decode(self.mimecontent)
 
     def __init__(self, service, id=None, xml=None, folder_id=None, **kwargs):
         self.service = service

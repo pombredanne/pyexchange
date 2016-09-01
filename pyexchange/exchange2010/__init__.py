@@ -1299,6 +1299,20 @@ class Exchange2010MailItem(BaseExchangeMailItem):
             raise NotImplemented
         properties = self._parse_mail_extended_properties(xml)
         self._update_properties(properties)
+        """
+        import ipdb
+        ipdb.set_trace()
+        attachments = xml.xpath(u'//t:FileAttachment', namespaces=soap_request.NAMESPACES)
+        to_recipients = xml.xpath(u'//t:ToRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
+        cc_recipients = xml.xpath(u'//t:CcRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
+        for attachment in attachments:
+            self.attachments.append({
+                'id': attachment.xpath(u't:AttachmentId/@Id', namespaces=soap_request.NAMESPACES)[0],
+                'filename': attachment.xpath(u't:Name', namespaces=soap_request.NAMESPACES),
+                'content_type': attachment.xpath(u't:ContentType', namespaces=soap_request.NAMESPACES),
+                'content_id': attachment.xpath(u't:ContentId', namespaces=soap_request.NAMESPACES),
+            })
+        """
         return self
 
     def __repr__(self):
