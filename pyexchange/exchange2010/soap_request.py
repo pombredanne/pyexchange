@@ -194,6 +194,17 @@ def find_items(folder_id, query_string=None, format=u'Default'):
     return root
 
 
+def get_attachments(ids):
+    root = M.GetAttachment(
+        M.AttachmentIds()
+    )
+
+    items_node = root.xpath("//m:AttachmentIds", namespaces=NAMESPACES)[0]
+    for i in ids:
+        items_node.append(T.AttachmentId(Id=i))
+    return root
+
+
 def get_mail_items(items, format=u'Default', include_mime_content=True):
     incl_mime_content = "true"
     if not include_mime_content:

@@ -1294,23 +1294,72 @@ class Exchange2010MailItem(BaseExchangeMailItem):
             namespace_map=soap_request.NAMESPACES,
         )
 
+    def _parse_attachments(self, xml):
+        # Use relative selectors here so that we can call this in the
+        # context of each Contact element without deepcopying.
+        property_map = {
+            u'id': {
+                u'xpath': u'descendant-or-self::t:AttachmentId/@Id',
+            },
+            u'name': {
+                u'xpath': u'descendant-or-self::t:Name',
+            },
+            u'content_type': {
+                u'xpath': u'descendant-or-self::t:ContentType',
+            },
+            u'content_id': {
+                u'xpath': u'descendant-or-self::t:ContentId',
+            },
+        }
+        return self.service._xpath_to_dict(
+            element=xml, property_map=property_map,
+            namespace_map=soap_request.NAMESPACES,
+        )
+
+    def _parse_recipient(self, xml):
+        # Use relative selectors here so that we can call this in the
+        # context of each Contact element without deepcopying.
+        property_map = {
+            u'name': {
+                u'xpath': u'descendant-or-self::t:Name',
+            },
+            u'email': {
+                u'xpath': u'descendant-or-self::t:EmailAddress',
+            },
+        }
+        return self.service._xpath_to_dict(
+            element=xml, property_map=property_map,
+            namespace_map=soap_request.NAMESPACES,
+        )
+
     def load_details_from_xml(self, xml, load_attachments=False):
         if load_attachments:
             raise NotImplemented
         properties = self._parse_mail_extended_properties(xml)
         self._update_properties(properties)
-        """
-        attachments = xml.xpath(u'//t:FileAttachment', namespaces=soap_request.NAMESPACES)
-        to_recipients = xml.xpath(u'//t:ToRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
-        cc_recipients = xml.xpath(u'//t:CcRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
-        for attachment in attachments:
-            self.attachments.append({
-                'id': attachment.xpath(u't:AttachmentId/@Id', namespaces=soap_request.NAMESPACES)[0],
-                'filename': attachment.xpath(u't:Name', namespaces=soap_request.NAMESPACES),
-                'content_type': attachment.xpath(u't:ContentType', namespaces=soap_request.NAMESPACES),
-                'content_id': attachment.xpath(u't:ContentId', namespaces=soap_request.NAMESPACES),
-            })
-        """
+
+        # working get attachment call! :)
+        # item = self.service.send(soap_request.get_attachments(['AAAdAENocmlzdG9waEBydWthaS51YmVyZ3JhcGUuY29tAEYAAAAAANaGNy8FozRNlNXwalrBrAIHAP/GjqevaOpAoUvDe14z/MUAAAti/4cAAP/GjqevaOpAoUvDe14z/MUAAAtjBWMAAAESABAAmk2jbTOnHE6mgVKBvZv3eQ==']))
+        attachments = []
+        recipients_to = []
+        recipients_cc = []
+        xml_attachments = xml.xpath(u'//t:FileAttachment', namespaces=soap_request.NAMESPACES)
+        xml_to_recipients = xml.xpath(u'//t:ToRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
+        xml_cc_recipients = xml.xpath(u'//t:CcRecipients/t:Mailbox', namespaces=soap_request.NAMESPACES)
+        for to_r in xml_to_recipients:
+            to_r_props = self._parse_recipient(to_r)
+            recipients_to.append(to_r_props)
+        self.recipients_to = recipients_to
+
+        for cc_r in xml_cc_recipients:
+            cc_r_props = self._parse_recipient(cc_r)
+            recipients_cc.append(cc_r_props)
+        self.recipients_cc = recipients_cc
+
+        for attachment in xml_attachments:
+            att_props = self._parse_attachments(attachment)
+            attachments.append(att_props)
+        self.attachments = attachments
         return self
 
     def __repr__(self):

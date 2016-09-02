@@ -33,8 +33,8 @@ class BaseExchangeMailItem(object):
     datetime_created = None
     mimecontent = None  # base64 encoded
     attachments = []
-    to_recipients = []
-    cc_recipients = []
+    recipients_to = []
+    recipients_cc = []
 
     @property
     def sender(self):
