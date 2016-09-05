@@ -11,7 +11,7 @@ from ..base.contacts import BaseExchangeContactService, BaseExchangeContactItem
 from ..base.folder import BaseExchangeFolder, BaseExchangeFolderService
 from ..base.mail import BaseExchangeMailService, BaseExchangeMailItem
 from ..base.tasks import BaseExchangeTaskService, BaseExchangeTaskItem
-from ..base.soap import ExchangeServiceSOAP
+from ..base.soap import ExchangeServiceSOAP, S
 from ..exceptions import FailedExchangeException, ExchangeStaleChangeKeyException, ExchangeItemNotFoundException, ExchangeInternalServerTransientErrorException, ExchangeIrresolvableConflictException, InvalidEventType
 from ..compat import BASESTRING_TYPES
 
@@ -55,6 +55,16 @@ class Exchange2010Service(ExchangeServiceSOAP):
             "Content-type": "text/xml; charset=%s " % encoding
         }
         return super(Exchange2010Service, self)._send_soap_request(body, headers=headers, retries=retries, timeout=timeout, encoding=encoding)
+
+    def _wrap_soap_xml_request(self, exchange_xml):
+        return S.Envelope(
+            S.Header(
+                T.RequestServerVersion(
+                    Version="Exchange2010",
+                ),
+            ),
+            S.Body(exchange_xml),
+        )
 
     def _check_for_errors(self, xml_tree):
         super(Exchange2010Service, self)._check_for_errors(xml_tree)
