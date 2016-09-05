@@ -59,7 +59,7 @@ class Exchange2010Service(ExchangeServiceSOAP):
     def _wrap_soap_xml_request(self, exchange_xml):
         return S.Envelope(
             S.Header(
-                T.RequestServerVersion(
+                soap_request.T.RequestServerVersion(
                     Version="Exchange2010",
                 ),
             ),
