@@ -1162,6 +1162,39 @@ class Exchange2010MailService(BaseExchangeMailService):
     def list_mails(self):
         return Exchange2010MailList(service=self.service, folder_id=self.folder_id)
 
+    def get_attachment(self, attachment_id):
+        """
+        downloads and parses an Email Attachment. Returns Dictionary
+        with this format:
+        {u'content': '<b64encoded content>',
+         u'name': 'Kermit_the_Frog.jpg',
+         u'content_type': 'image/jpeg'}
+        """
+        property_map = {
+            u'name': {
+                u'xpath': u'descendant-or-self::t:Name',
+            },
+            u'content_type': {
+                u'xpath': u'descendant-or-self::t:ContentType',
+            },
+            u'content': {
+                u'xpath': u'descendant-or-self::t:Content',
+            },
+        }
+
+        xml_request = soap_request.get_attachments([attachment_id])
+        response = self.service.send(xml_request)
+        atts = response.xpath(u'//t:FileAttachment',
+                              namespaces=soap_request.NAMESPACES)
+        att_dict = None
+        for xml in atts:
+            att_dict = self.service._xpath_to_dict(
+                element=xml, property_map=property_map,
+                namespace_map=soap_request.NAMESPACES,
+            )
+
+        return att_dict
+
 
 class Exchange2010MailList(object):
     def __init__(self, service=None, folder_id=u'inbox', xml_result=None):
@@ -1241,9 +1274,9 @@ class Exchange2010MailItem(BaseExchangeMailItem):
 
         return self
 
-    def init_from_aco(self, object):
-        self._id = object['eid']
-        for meta in object['detail']['meta']:
+    def init_from_aco(self, obj, attachment_url=None):
+        self._id = obj['eid']
+        for meta in obj['detail']['meta']:
             if meta['label'] == 'Subject':
                 self.subject = meta['value']
             elif meta['label'] == 'Sent':
@@ -1255,6 +1288,13 @@ class Exchange2010MailItem(BaseExchangeMailItem):
             elif meta['label'] == 'Importance':
                 self.importance = meta['value']
         self.load_extended_properties()
+        if attachment_url is not None:
+            import urllib
+            import base64
+            for att in self.attachments:
+                att['att_url'] = attachment_url + "?" + urllib.urlencode(
+                    (('att_id', base64.b64encode(att['id'])),)
+                )
 
     def load_extended_properties(self):
         body = soap_request.get_mail_items([self])
@@ -1324,6 +1364,9 @@ class Exchange2010MailItem(BaseExchangeMailItem):
             },
             u'mimecontent': {
                 u'xpath': u'descendant-or-self::t:Message/t:MimeContent',
+            },
+            u'mail_body': {
+                u'xpath': u'descendant-or-self::t:Message/t:Body',
             },
         }
         return self.service._xpath_to_dict(

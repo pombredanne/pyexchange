@@ -205,7 +205,7 @@ def get_attachments(ids):
     return root
 
 
-def get_mail_items(items, format=u'Default', include_mime_content=True):
+def get_mail_items(items, format=u'Default', include_mime_content=False):
     incl_mime_content = "true"
     if not include_mime_content:
         incl_mime_content = "false"
