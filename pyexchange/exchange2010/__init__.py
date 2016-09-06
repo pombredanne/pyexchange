@@ -1201,7 +1201,6 @@ class Exchange2010MailList(object):
             return
 
         for mail_xml in mails:
-            log.debug(u'Adding contact item to contact list...')
             id = mail_xml.xpath(u'descendant-or-self::t:Message/t:ItemId/@Id',
                                 namespaces=soap_request.NAMESPACES)
             mail = mail_dict[id[0]]
@@ -1241,6 +1240,30 @@ class Exchange2010MailItem(BaseExchangeMailItem):
         self._update_properties(properties)
 
         return self
+
+    def init_from_aco(self, object):
+        self._id = object['eid']
+        for meta in object['detail']['meta']:
+            if meta['label'] == 'Subject':
+                self.subject = meta['value']
+            elif meta['label'] == 'Sent':
+                self.datetime_sent = meta['value']
+            elif meta['label'] == 'Culture':
+                self.culture = meta['value']
+            elif meta['label'] == 'Size':
+                self.size = meta['value']
+            elif meta['label'] == 'Importance':
+                self.importance = meta['value']
+        self.load_extended_properties()
+
+    def load_extended_properties(self):
+        body = soap_request.get_mail_items([self])
+        xml_result = self.service.send(body)
+        mails = xml_result.xpath(u'//t:Message',
+                                 namespaces=soap_request.NAMESPACES)
+        for m in mails:
+            # this should only happen once
+            self.load_details_from_xml(m)
 
     def _parse_mail_properties(self, xml):
         # Use relative selectors here so that we can call this in the

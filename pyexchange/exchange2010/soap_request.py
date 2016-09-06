@@ -218,7 +218,10 @@ def get_mail_items(items, format=u'Default', include_mime_content=True):
 
     items_node = root.xpath("//m:ItemIds", namespaces=NAMESPACES)[0]
     for i in items:
-        items_node.append(T.ItemId(Id=i._id, ChangeKey=i._change_key))
+        if i._change_key:
+            items_node.append(T.ItemId(Id=i._id, ChangeKey=i._change_key))
+        else:
+            items_node.append(T.ItemId(Id=i._id))
     return root
 
 
